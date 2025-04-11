@@ -1,0 +1,350 @@
+---
+title: "climate-impact-hw1"
+format: 
+  html:
+    code-fold: true
+    theme: lux
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(here)
+library(gt)
+library(slider) 
+library(patchwork)
+library(feasts)
+library(forecast)
+library(tsibble)
+library(zoo)
+```
+
+```{r}
+data = read_csv(here("data/3987008.csv"))
+```
+
+```{r}
+# Calculate the 5-day rolling average for TMAX using slider
+result <- data %>%
+  arrange(STATION, DATE) %>%
+  group_by(STATION) %>%
+  mutate(TMAX_5day_avg = slide_dbl(
+    TMAX,
+    ~mean(.x, na.rm = TRUE),
+    .before = 365,
+    .complete = TRUE
+  )) %>%
+  ungroup()
+
+
+# Plot the original TMAX vs 5-day rolling average for a single station
+single_station <- result %>%
+  filter(STATION == first(STATION))  
+
+plot <- ggplot(single_station, aes(x = DATE)) +
+  geom_line(aes(y = TMAX, color = "Daily TMAX")) +
+  geom_line(aes(y = TMAX_5day_avg, color = "5-day Rolling Avg"), linewidth = 1) +
+  labs(title = "TMAX vs 365-day Rolling Average",
+       x = "Date", 
+       y = "Temperature (Tmax)",
+       color = "Measure") +
+  theme_minimal()
+
+plot
+```
+
+
+
+```{r}
+# Calculate the 365-day rolling average for both TMAX and TMIN
+result <- data %>%
+  arrange(STATION, DATE) %>%
+  group_by(STATION) %>%
+  mutate(
+    TMAX_365day_avg = slide_dbl(
+      TMAX,
+      ~mean(.x, na.rm = TRUE),
+      .before = 365,
+      .complete = TRUE
+    ),
+    TMIN_365day_avg = slide_dbl(
+      TMIN,
+      ~mean(.x, na.rm = TRUE),
+      .before = 365,
+      .complete = TRUE
+    )
+  ) %>%
+  ungroup()
+
+# Plot for a single station with both TMAX and TMIN
+single_station <- result %>%
+  filter(STATION == first(STATION))
+
+# Plot for TMAX
+plot_tmax <- ggplot(single_station, aes(x = DATE)) +
+  geom_line(aes(y = TMAX, color = "Daily TMAX")) +
+  geom_line(aes(y = TMAX_365day_avg, color = "365-day Rolling Avg"), linewidth = 1) +
+  labs(title = "TMAX vs 365-day Rolling Average",
+       x = "Date", 
+       y = "Temp (Tmax)",
+       color = "Measure") +
+  theme_minimal()
+
+# Plot for TMIN
+plot_tmin <- ggplot(single_station, aes(x = DATE)) +
+  geom_line(aes(y = TMIN, color = "Daily TMIN")) +
+  geom_line(aes(y = TMIN_365day_avg, color = "365-day Rolling Avg"), linewidth = 1) +
+  labs(title = "TMIN vs 365-day Rolling Average",
+       x = "Date", 
+       y = "Temp (Tmin)",
+       color = "Measure") +
+  theme_minimal()
+
+# Display both plots
+plot_tmax / plot_tmin
+```
+```{r}
+# Create a combined plot with all four lines
+combined_plot <- ggplot(single_station, aes(x = DATE)) +
+  geom_line(aes(y = TMAX, color = "Daily TMAX"), alpha = 0.7) +
+  geom_line(aes(y = TMAX_365day_avg, color = "TMAX 365-day Rolling Avg"), linewidth = 1) +
+  geom_line(aes(y = TMIN, color = "Daily TMIN"), alpha = 0.7) +
+  geom_line(aes(y = TMIN_365day_avg, color = "TMIN 365-day Rolling Avg"), linewidth = 1) +
+  scale_color_manual(values = c(
+    "Daily TMAX" = "red", 
+    "TMAX 365-day Rolling Avg" = "darkred",
+    "Daily TMIN" = "blue", 
+    "TMIN 365-day Rolling Avg" = "darkblue"
+  )) +
+  labs(title = "Temperature Extremes, 365-day Rolling Averages",
+       x = "Date", 
+       y = "Temperature",
+       color = "Measure") +
+  theme_minimal()
+
+# Display the combined plot
+combined_plot
+
+
+```
+
+
+```{r}
+# convert data into time series object
+weather_ts = data %>% 
+  mutate(yr_mo = yearmonth(DATE)) %>% 
+  group_by(yr_mo) %>% 
+  summarize(avg_max_temp = mean(TMAX, na.rm = TRUE)) %>% 
+  tsibble(index = yr_mo) %>% 
+  fill_gaps() %>%
+  mutate(avg_max_temp = na.approx(avg_max_temp, na.rm = FALSE))
+
+# decompose our time series data
+# STL decomposition = splitting our data into trend + seasonal + noise
+
+decomposition <- weather_ts %>% 
+  model(STL(avg_max_temp))
+
+# obtain components from dcmp
+components(decomposition)
+
+# season adjust = predicted avg temperature that's adjusted for seasonal trends
+
+components(decomposition) %>% 
+  autoplot() +
+  theme_bw()
+```
+
+```{r}
+# Extract years
+hottest_days <- data %>%
+  mutate(year = as.numeric(substr(DATE, 1, 4))) %>%
+  group_by(year) %>%
+  summarize(hottest_temp = max(TMAX, na.rm = TRUE)) %>%
+  ungroup()
+
+# Create the plot
+ggplot(hottest_days, aes(x = year, y = hottest_temp)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "Hottest Day of Each Year (Valley Center, CA)",
+    x = "Year",
+    y = "Maximum Temperature (°F)",
+    caption = "Data source: Valley Center, CA weather station"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+# Extract years
+coldest_days <- data %>%
+  mutate(year = as.numeric(substr(DATE, 1, 4))) %>%
+  group_by(year) %>%
+  summarize(coldest_temp = min(TMIN, na.rm = TRUE)) %>%
+  ungroup()
+
+# Create the plot
+ggplot(coldest_days, aes(x = year, y = coldest_temp)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "Coldest Day of Each Year (Valley Center, CA)",
+    x = "Year",
+    y = "Minimum Temperature (°F)",
+    caption = "Data source: Valley Center, CA weather station"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+# Calculate the decade for each observation
+data <- data %>%
+  mutate(decade = floor(lubridate::year(DATE) / 10) * 10)
+
+# Calculate annual mean temperatures
+annual_means <- data %>%
+  mutate(year = lubridate::year(DATE)) %>%
+  group_by(year) %>%
+  summarize(
+    mean_TAVG = mean(TAVG, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Calculate decadal means
+decadal_means <- data %>%
+  group_by(decade) %>%
+  summarize(
+    mean_TAVG = mean(TAVG, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Create a dataset for plotting the decadal mean lines
+# This expands each decade's mean across all years in that decade
+decadal_lines <- decadal_means %>%
+  mutate(
+    start_year = decade,
+    end_year = decade + 9
+  ) %>%
+  rowwise() %>%
+  do(data.frame(
+    year = seq(.$start_year, .$end_year, by = 1),
+    decadal_mean = rep(.$mean_TAVG, 10),
+    decade = rep(.$decade, 10)
+  ))
+
+# Create the plot
+ggplot() +
+  # Add annual temperature values as a gray line
+  geom_line(data = annual_means, aes(x = year, y = mean_TAVG), 
+            color = "gray50", alpha = 0.8) +
+  # Add horizontal lines for each decade's mean
+  geom_line(data = decadal_lines, aes(x = year, y = decadal_mean, group = decade), 
+            color = "black", size = 1) +
+  # Add decade transitions with vertical lines
+  geom_vline(xintercept = c(1990, 2000, 2010, 2020), 
+             linetype = "dashed", color = "gray70", alpha = 0.6) +
+  # Labels
+  labs(
+    title = "Time Series of Temperature with Shifts in Decadal Means",
+    x = "Year",
+    y = "Temperature (°F)",
+    caption = "Data source: Valley Center, CA weather station (1990-2025)"
+  ) +
+  # Clean theme
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  )
+```
+```{r}
+# Perform t-tests between consecutive decades
+# Create empty dataframe to store results
+t_test_results <- data.frame(
+  decade1 = numeric(),
+  decade2 = numeric(),
+  p_value = numeric(),
+  significant = logical(),
+  mean_diff = numeric()
+)
+
+# Perform t-tests for each pair of consecutive decades
+decades <- sort(unique(data$decade))
+for (i in 1:(length(decades)-1)) {
+  decade1 <- decades[i]
+  decade2 <- decades[i+1]
+  
+  # Extract data for each decade
+  data_decade1 <- data %>% filter(decade == decade1) %>% pull(TAVG)
+  data_decade2 <- data %>% filter(decade == decade2) %>% pull(TAVG)
+  
+  # Perform t-test
+  t_result <- t.test(data_decade1, data_decade2)
+  
+  # Store results
+  t_test_results <- rbind(t_test_results, data.frame(
+    decade1 = decade1,
+    decade2 = decade2,
+    p_value = t_result$p.value,
+    significant = t_result$p.value < 0.05,
+    mean_diff = mean(data_decade2, na.rm = TRUE) - mean(data_decade1, na.rm = TRUE)
+  ))
+}
+
+# Prepare annotations for the plot
+significance_annotations <- t_test_results %>%
+  mutate(
+    x_pos = decade1 + 5,  # Position in the middle of the decades
+    y_pos = max(annual_means$mean_TAVG) + 0.5,  # Position above the plot
+    label = ifelse(significant, 
+                   paste0("p=", sprintf("%.4f", p_value), "*"), 
+                   paste0("p=", sprintf("%.4f", p_value)))
+  )
+
+# Create the plot
+ggplot() +
+  # Add annual temperature values as a gray line
+  geom_line(data = annual_means, aes(x = year, y = mean_TAVG), 
+            color = "gray50", alpha = 0.8) +
+  # Add horizontal lines for each decade's mean
+  geom_line(data = decadal_lines, aes(x = year, y = decadal_mean, group = decade), 
+            color = "black", size = 1) +
+  # Add decade transitions with vertical lines
+  geom_vline(xintercept = c(1990, 2000, 2010, 2020), 
+             linetype = "dashed", color = "gray70", alpha = 0.6) +
+  # Add significance annotations
+  geom_text(data = significance_annotations, 
+            aes(x = x_pos, y = y_pos, label = label, color = significant),
+            show.legend = FALSE) +
+  geom_segment(data = significance_annotations,
+               aes(x = decade1, xend = decade2, 
+                   y = y_pos - 0.3, yend = y_pos - 0.3,
+                   color = significant),
+               arrow = arrow(ends = "both", length = unit(0.1, "inches")),
+               show.legend = FALSE) +
+  scale_color_manual(values = c("FALSE" = "gray30", "TRUE" = "red")) +
+  # Labels
+  labs(
+    title = "Time Series of Temperature with Shifts in Decadal Means",
+    subtitle = "* indicates statistically significant shift (p < 0.05)",
+    x = "Year",
+    y = "Temperature (°F)",
+    caption = "Data source: Valley Center, CA weather station (1990-2025)"
+  ) +
+  # Clean theme
+  theme_minimal() +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  )
+```
+
