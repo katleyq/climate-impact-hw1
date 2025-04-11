@@ -348,3 +348,201 @@ ggplot() +
   )
 ```
 
+```{r}
+# Filter data for the two decades of interest
+data_2000s <- data %>% 
+  filter(lubridate::year(DATE) >= 2000 & lubridate::year(DATE) <= 2009)
+
+data_2010s <- data %>% 
+  filter(lubridate::year(DATE) >= 2010 & lubridate::year(DATE) <= 2019)
+
+# Prepare a combined dataset for plotting
+comparison_data <- bind_rows(
+  data_2000s %>% mutate(decade = "2000-2009"),
+  data_2010s %>% mutate(decade = "2010-2019")
+)
+
+# Calculate summary statistics for each decade
+decade_stats <- comparison_data %>%
+  group_by(decade) %>%
+  summarize(
+    mean_temp = mean(TAVG, na.rm = TRUE),
+    median_temp = median(TAVG, na.rm = TRUE),
+    max_temp = max(TAVG, na.rm = TRUE),
+    q95_temp = quantile(TAVG, 0.95, na.rm = TRUE),
+    sd_temp = sd(TAVG, na.rm = TRUE)
+  )
+
+# Get plot dimensions for better label placement
+min_temp <- min(comparison_data$TAVG, na.rm = TRUE)
+max_temp <- max(comparison_data$TAVG, na.rm = TRUE)
+x_range <- max_temp - min_temp
+
+# Create the distribution comparison plot
+ggplot(comparison_data, aes(x = TAVG, fill = decade)) +
+  # Add density plots with transparency
+  geom_density(alpha = 0.7, aes(color = decade), linewidth = 1) +
+  # Add vertical lines for means
+  geom_vline(data = decade_stats, aes(xintercept = mean_temp, color = decade),
+             linetype = "dashed", linewidth = 1) +
+  # Add vertical lines for 95th percentiles
+  geom_vline(data = decade_stats, aes(xintercept = q95_temp, color = decade),
+             linetype = "dotted", linewidth = 1) +
+  # Add custom colors - lighter for 2000s, darker for 2010s
+  scale_fill_manual(values = c("2000-2009" = "#ADD8E6", "2010-2019" = "#0066CC"),
+                   name = "Decade") +
+  scale_color_manual(values = c("2000-2009" = "#87CEFA", "2010-2019" = "#00008B"),
+                    name = "Decade") +
+  # Create a separate data frame for annotations with better positioning
+  # Add text to the bottom left corner of the plot
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.04, 
+           label = paste0("2000-2009 Mean: ", round(decade_stats$mean_temp[decade_stats$decade == "2000-2009"], 1), "°F"),
+           color = "#87CEFA", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.035, 
+           label = paste0("2010-2019 Mean: ", round(decade_stats$mean_temp[decade_stats$decade == "2010-2019"], 1), "°F"),
+           color = "#00008B", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.025, 
+           label = paste0("2000-2009 95th %: ", round(decade_stats$q95_temp[decade_stats$decade == "2000-2009"], 1), "°F"),
+           color = "#87CEFA", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.02, 
+           label = paste0("2010-2019 95th %: ", round(decade_stats$q95_temp[decade_stats$decade == "2010-2019"], 1), "°F"),
+           color = "#00008B", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  # Add labels
+  labs(
+    title = "Distribution of Daily Average Temperatures (TAVG)",
+    subtitle = "Comparison between 2000-2009 and 2010-2019",
+    x = "Average Temperature (°F)",
+    y = "Density",
+    caption = "Data source: Valley Center, CA weather station"
+  ) +
+  # Ensure the plot extends far enough to include all labels
+  coord_cartesian(clip = "off") +
+  # Clean theme
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    # Add more margin on the right to accommodate labels
+    plot.margin = margin(0.5, 2, 0.5, 0.5, "cm")
+  )
+```
+
+```{r}
+# Filter data for the two decades of interest
+data_2000s <- data %>% 
+  filter(lubridate::year(DATE) >= 2000 & lubridate::year(DATE) <= 2009)
+
+data_2010s <- data %>% 
+  filter(lubridate::year(DATE) >= 2010 & lubridate::year(DATE) <= 2019)
+
+# Prepare a combined dataset for plotting
+comparison_data <- bind_rows(
+  data_2000s %>% mutate(decade = "2000-2009"),
+  data_2010s %>% mutate(decade = "2010-2019")
+)
+
+# Calculate summary statistics for each decade
+decade_stats <- comparison_data %>%
+  group_by(decade) %>%
+  summarize(
+    mean_temp = mean(TMAX, na.rm = TRUE),
+    median_temp = median(TMAX, na.rm = TRUE),
+    max_temp = max(TMAX, na.rm = TRUE),
+    q95_temp = quantile(TMAX, 0.95, na.rm = TRUE),
+    sd_temp = sd(TMAX, na.rm = TRUE)
+  )
+
+# Get plot dimensions for better label placement
+min_temp <- min(comparison_data$TMAX, na.rm = TRUE)
+max_temp <- max(comparison_data$TMAX, na.rm = TRUE)
+x_range <- max_temp - min_temp
+
+# Create the distribution comparison plot
+ggplot(comparison_data, aes(x = TMAX, fill = decade)) +
+  # Add density plots with transparency
+  geom_density(alpha = 0.7, aes(color = decade), linewidth = 1) +
+  # Add vertical lines for means
+  geom_vline(data = decade_stats, aes(xintercept = mean_temp, color = decade),
+             linetype = "dashed", linewidth = 1) +
+  # Add vertical lines for 95th percentiles
+  geom_vline(data = decade_stats, aes(xintercept = q95_temp, color = decade),
+             linetype = "dotted", linewidth = 1) +
+  # Add custom colors - lighter for 2000s, darker for 2010s
+  scale_fill_manual(values = c("2000-2009" = "#ADD8E6", "2010-2019" = "#0066CC"),
+                   name = "Decade") +
+  scale_color_manual(values = c("2000-2009" = "#87CEFA", "2010-2019" = "#00008B"),
+                    name = "Decade") +
+  # Create a separate data frame for annotations with better positioning
+  # Add text to the bottom left corner of the plot
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.04, 
+           label = paste0("2000-2009 Mean: ", round(decade_stats$mean_temp[decade_stats$decade == "2000-2009"], 1), "°F"),
+           color = "#87CEFA", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.035, 
+           label = paste0("2010-2019 Mean: ", round(decade_stats$mean_temp[decade_stats$decade == "2010-2019"], 1), "°F"),
+           color = "#00008B", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.025, 
+           label = paste0("2000-2009 95th %: ", round(decade_stats$q95_temp[decade_stats$decade == "2000-2009"], 1), "°F"),
+           color = "#87CEFA", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  annotate("text", x = min_temp + x_range * 0.1, 
+           y = 0.02, 
+           label = paste0("2010-2019 95th %: ", round(decade_stats$q95_temp[decade_stats$decade == "2010-2019"], 1), "°F"),
+           color = "#00008B", 
+           size = 4, 
+           fontface = "bold",
+           hjust = 0) +
+  # Add labels
+  labs(
+    title = "Distribution of Daily Maximum Temperatures (TMAX)",
+    subtitle = "Comparison between 2000-2009 and 2010-2019",
+    x = "Maximum Temperature (°F)",
+    y = "Density",
+    caption = "Data source: Valley Center, CA weather station"
+  ) +
+  # Ensure the plot extends far enough to include all labels
+  coord_cartesian(clip = "off") +
+  # Clean theme
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    # Add more margin on the right to accommodate labels
+    plot.margin = margin(0.5, 2, 0.5, 0.5, "cm")
+  )
+```
+
+
+

@@ -11,17 +11,16 @@ This R Markdown document will show you how to read in a climate time series and 
 
 ### Getting Started: set up environment
 
-The first step is to read in some data. Here, I've chosen the Lake Cachuma station from the National Centers for Environmental Information website:
-https://www.ncdc.noaa.gov/cdo-web/datatools/findstation
+The first step is to read in some data. Here, I've chosen the Lake Cachuma station from the National Centers for Environmental Information website: <https://www.ncdc.noaa.gov/cdo-web/datatools/findstation>
 
 The packages we will need for this analysis are:
 
-* lubridate: makes it easier to work with date information and use it in plotting
-* tidyverse: a suite of R packages designed to optimize working with "tidy" data. This package contains other ones, including the `ggplot2` package that helps with making nice-looking graphs!
-* Kendall: this will be needed later on in the document, it contains functions for running the Mann-Kendall nonparametric test for trends that we discussed in class.
-
+-   lubridate: makes it easier to work with date information and use it in plotting
+-   tidyverse: a suite of R packages designed to optimize working with "tidy" data. This package contains other ones, including the `ggplot2` package that helps with making nice-looking graphs!
+-   Kendall: this will be needed later on in the document, it contains functions for running the Mann-Kendall nonparametric test for trends that we discussed in class.
 
 ### Reading in data
+
 In the code block below, the read.table command loads the CSV file provided by NCDC into a table structure in R, here called 'clim'; this particular file happens to be comma-delimited, so we specify `sep=','` to let R determine which data fits in separate entries in the table. We can also fill in empty entries with "NA" by setting `fill=TRUE`, and let R make sense of the file header by setting `header=T`.
 
 Once the data has been read in, the as.Date command then transforms the DATE field in that table into an R-formatted date array that R knows how to do things with.
@@ -37,7 +36,7 @@ clim = read.table("CachumaLake_NCDC_USC00041253.csv",fill=TRUE,sep=',',header=T)
 head(clim)
 ```
 
-The data looks reasonable - the head command should output fields like "Station", "Date", and "PRCP" (where PRCP = precipitation). _When you run this for your own data, you may end up with different fields, depending on what you downloaded from the NCDC website!_
+The data looks reasonable - the head command should output fields like "Station", "Date", and "PRCP" (where PRCP = precipitation). *When you run this for your own data, you may end up with different fields, depending on what you downloaded from the NCDC website!*
 
 ```{r asdate}
 date=as.Date(clim$DATE)
@@ -45,12 +44,14 @@ date=as.Date(clim$DATE)
 ```
 
 ### Running basic quality checks
+
 Now that we've read in the data, the next step is quality checking! Let's make a plot to see what data are missing. Some of the syntax used below:
 
-* `aes`: the aesthetics of the plot. Here we'll use `aes(date, [data variable])` where [data variable] is temperature or precipitation; this tells ggplot to "map" other commands onto the aesthetics of the plot of those particular variables.
-* `geom_line`: plots a best-fit line through the data points
+-   `aes`: the aesthetics of the plot. Here we'll use `aes(date, [data variable])` where [data variable] is temperature or precipitation; this tells ggplot to "map" other commands onto the aesthetics of the plot of those particular variables.
+-   `geom_line`: plots a best-fit line through the data points
 
-Lets start with daily data of air temperature 
+Lets start with daily data of air temperature
+
 ```{r dailyplots, echo=TRUE}
 
 ggplot(clim, aes(date, TMAX))+geom_line()+ labs(y="Daily Maximum Temperature (degrees F)", x="Date")
@@ -61,23 +62,19 @@ ggplot(clim, aes(date, PRCP))+geom_line()+ labs(y="Daily Rainfall (in)", x="Date
 
 ```
 
-
-Some values are "NA" in temperature and precipitation; these have been trimmed automatically by ggplot, but this may not be the case for all functions. In general, you'll want to check meta data to see how missing data is labelled: -999 or NA are common choices. 
+Some values are "NA" in temperature and precipitation; these have been trimmed automatically by ggplot, but this may not be the case for all functions. In general, you'll want to check meta data to see how missing data is labelled: -999 or NA are common choices.
 
 ### Filling in missing data
 
-Generally speaking, if not much (say, < 0.5 percent) of your data is missing, then it's not going to cause substantial problems to fill in those gaps by making reasonable approximations. *BUT, you must remember that you are doing this!!!* Otherwise, you run the risk of drawing false conclusions by over-counting data that's not "real".
+Generally speaking, if not much (say, \< 0.5 percent) of your data is missing, then it's not going to cause substantial problems to fill in those gaps by making reasonable approximations. *BUT, you must remember that you are doing this!!!* Otherwise, you run the risk of drawing false conclusions by over-counting data that's not "real".
 
 Some good rules of thumb for filling in missing data:
 
-* **Temperature**
-Replace missing data with the average of the previous and following day
+-   **Temperature** Replace missing data with the average of the previous and following day
 
-* **Precip**
-For dry places like the Sierra, assume no rain where data is missing (This may not be a good assumption in other places! be careful.)
+-   **Precip** For dry places like the Sierra, assume no rain where data is missing (This may not be a good assumption in other places! be careful.)
 
 Some demonstrations of how to do this in R are shown in the code block below:
-
 
 ```{r dailyplots.filled, echo=TRUE}
 
@@ -101,10 +98,9 @@ ggplot(clim, aes(date, clim$TMAX))+geom_line()+ labs(y="Daily Maximum Temperatur
 
 ```
 
-
 ### Determining whether there is a trend
 
-Now that the data has been cleaned up, it's time to actually do the trend analysis. BUT, trends can be 'swamped' by variation; in this case, the seasonal cycle is quite large. We also need to consider autocorrelation! 
+Now that the data has been cleaned up, it's time to actually do the trend analysis. BUT, trends can be 'swamped' by variation; in this case, the seasonal cycle is quite large. We also need to consider autocorrelation!
 
 So here let's try doing some aggregation to reduce the noise. As a simple example, we can try annual averages.
 
@@ -123,7 +119,7 @@ geom_point(data=clim.mwy, aes(x=dt, tmin), col="blue")
 
 ```
 
-Notice the different behavior of the min and max temperatures! 
+Notice the different behavior of the min and max temperatures!
 
 OK now let's put a trend line on this thing.
 
@@ -135,8 +131,6 @@ a
 a+ stat_smooth(data=clim.mwy, aes(x=dt,tmin), col="blue", method="lm")
 
 ```
-
-
 
 Now let's calculate the slope (or how quickly temperatures are rising; we do this with linear regression)
 
@@ -152,7 +146,6 @@ ggplot(clim.mwy, aes(x=dt, y=tmin)) + stat_summary(fun.y="mean", geom="point", c
 The slope on a linear regression between Tmin and wy is the rate of increase in Tmin (mean annual daily minimum temperature).
 
 The value of the slope is -0.015 F/year, and is not statistically significant.
-
 
 Let's do the same analysis for the MAXIMUM temperature now...
 
@@ -187,7 +180,6 @@ ggplot(subset(clim.mwy, clim.mwy$dt %in% c(1995:2021)), aes(x=dt, y=tmin)) + sta
 
 ```
 
-
 ### Non-parametric trend test: Mann-Kendall
 
 Regression assumes a linear relationship - and normally distributed data - sometimes that isn't true, we can use non-parameteric tests to look for trends. In these cases, the Mann-Kendall test is commonly used.
@@ -207,9 +199,7 @@ MannKendall(clim.mwy$precip)
 
 We might also look at difference in means (or variance) between the two periods ...Using
 
-T-test (if we think the data is normally distributed)
-or Rank-Sum if we do not.
-
+T-test (if we think the data is normally distributed) or Rank-Sum if we do not.
 
 ```{r ttest, echo=TRUE}
 
@@ -218,14 +208,12 @@ t.test(subset(clim.mwy$tmin, clim.mwy$dt %in% 1953:1969), subset(clim.mwy$tmin, 
 wilcox.test(subset(clim.mwy$tmin, clim.mwy$dt %in% 1953:1969), subset(clim.mwy$tmin, clim.mwy$dt %in% 1995:2004))
 
 ```
-There is a statistically significant difference in the means according to both tests, although the p value is slightly lower for the T test.
 
+There is a statistically significant difference in the means according to both tests, although the p value is slightly lower for the T test.
 
 ### Aggregation: seasonal!
 
-An alternative approach to aggregation (mean by year)
-is to look at a particular season, lets say we want to look only at summer (July and August)
-
+An alternative approach to aggregation (mean by year) is to look at a particular season, lets say we want to look only at summer (July and August)
 
 ```{r alternative, echo=TRUE}
 # create a variable
@@ -244,6 +232,5 @@ summary(res)
 confint(res,"wy", level=0.95)
 
 ```
+
 Notice how the trends in summer minimum temperature differ from the annual minimum temperature trend!
-
-
